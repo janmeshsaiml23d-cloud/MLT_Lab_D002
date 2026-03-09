@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Neural Network Sentiment Lab</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+<style>
+body{
+font-family: Arial;
+background:#eef1f6;
+padding:30px;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:10px;
+box-shadow:0 3px 10px rgba(0,0,0,0.1);
+margin-bottom:20px;
+}
+
+button{
+padding:10px 18px;
+margin:5px;
+border:none;
+border-radius:6px;
+background:#2d7ff9;
+color:white;
+font-weight:bold;
+cursor:pointer;
+}
+
+input{
+padding:10px;
+width:300px;
+border-radius:6px;
+border:1px solid #ccc;
+}
+
+#log{
+background:#111;
+color:#0f0;
+font-family:monospace;
+padding:15px;
+height:220px;
+overflow-y:scroll;
+border-radius:6px;
+}
+
+.result{
+margin-top:15px;
+font-weight:bold;
+font-size:18px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>Neural Network Sentiment Lab</h2>
+
+<button onclick="runDense()">Train Dense</button>
+<button onclick="runRNN()">Train RNN</button>
+<button onclick="runLSTM()">Train LSTM</button>
+
+<br><br>
+
+<input id="textInput" placeholder="Type sentence like: love great">
+<button onclick="predictText()">Predict</button>
+
+<div id="prediction" class="result"></div>
+
+</div>
+
+<div class="card">
+<h3>Training Log</h3>
+<div id="log">System Ready...</div>
+</div>
+
+<script>
+
+const logger=document.getElementById("log");
+function log(msg){
+logger.innerHTML+="<br>> "+msg;
+logger.scrollTop=logger.scrollHeight;
+}
+
+/* Vocabulary */
+const vocab={
+love:1,
+great:2,
+bad:3,
+terrible:4,
+good:5,
+awesome:6,
+worst:7
+};
+
+/* Training Data */
+const trainX=[
+[1,2,0,0],
+[2,1,0,0],
+[5,6,0,0],
+[3,4,0,0],
+[4,3,0,0],
+[7,3,0,0]
+];
+
+const trainY=[1,1,1,0,0,0];
+
+let model=null;
+
+/* Tokenizer */
+function encode(text){
+
+const words=text.toLowerCase().split(" ");
+let arr=[0,0,0,0];
+
+for(let i=0;i<words.length && i<4;i++){
+arr[i]=vocab[words[i]] || 0;
+}
+
+return arr;
+}
+
+/* Training callback */
+const callback={
+onEpochEnd:(epoch,logs)=>{
+log(`Epoch ${epoch+1} | Loss:${logs.loss.toFixed(4)} | Acc:${logs.acc?.toFixed(4)}`);
+}
+};
+
+/* Dense Model */
+async function runDense(){
+
+log("Initializing Dense Model");
+
+model=tf.sequential();
+
+model.add(tf.layers.dense({
+units:10,
+activation:"relu",
+inputShape:[4]
+}));
+
+model.add(tf.layers.dense({
+units:1,
+activation:"sigmoid"
+}));
+
+model.compile({
+optimizer:"adam",
+loss:"binaryCrossentropy",
+metrics:["accuracy"]
+});
+
+const xs=tf.tensor2d(trainX);
+const ys=tf.tensor2d(trainY,[6,1]);
+
+await model.fit(xs,ys,{
+epochs:40,
+callbacks:callback
+});
+
+log("Dense Training Finished");
+
+}
+
+/* RNN Model */
+async function runRNN(){
+
+log("Initializing RNN Model");
+
+model=tf.sequential();
+
+model.add(tf.layers.embedding({
+inputDim:10,
+outputDim:8,
+inputLength:4
+}));
+
+model.add(tf.layers.simpleRNN({
+units:10
+}));
+
+model.add(tf.layers.dense({
+units:1,
+activation:"sigmoid"
+}));
+
+model.compile({
+optimizer:"adam",
+loss:"binaryCrossentropy",
+metrics:["accuracy"]
+});
+
+const xs=tf.tensor2d(trainX);
+const ys=tf.tensor2d(trainY,[6,1]);
+
+await model.fit(xs,ys,{
+epochs:40,
+callbacks:callback
+});
+
+log("RNN Training Finished");
+
+}
+
+/* LSTM Model */
+async function runLSTM(){
+
+log("Initializing LSTM Model");
+
+model=tf.sequential();
+
+model.add(tf.layers.embedding({
+inputDim:10,
+outputDim:8,
+inputLength:4
+}));
+
+model.add(tf.layers.lstm({
+units:12
+}));
+
+model.add(tf.layers.dense({
+units:1,
+activation:"sigmoid"
+}));
+
+model.compile({
+optimizer:"adam",
+loss:"binaryCrossentropy",
+metrics:["accuracy"]
+});
+
+const xs=tf.tensor2d(trainX);
+const ys=tf.tensor2d(trainY,[6,1]);
+
+await model.fit(xs,ys,{
+epochs:40,
+callbacks:callback
+});
+
+log("LSTM Training Finished");
+
+}
+
+/* Prediction */
+function predictText(){
+
+if(!model){
+alert("Train a model first!");
+return;
+}
+
+const text=document.getElementById("textInput").value;
+
+const encoded=encode(text);
+
+const pred=model.predict(tf.tensor2d([encoded]));
+
+const value=pred.dataSync()[0];
+
+let sentiment=value>0.5 ? "Positive 😊" : "Negative 😡";
+
+document.getElementById("prediction").innerText=
+`Prediction: ${sentiment} (${value.toFixed(3)})`;
+
+}
+
+</script>
+
+</body>
+</html>

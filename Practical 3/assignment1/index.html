@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Mood Inspector</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:#0f172a;
+color:white;
+display:flex;
+justify-content:center;
+padding:50px;
+}
+
+.box{
+background:#1e293b;
+padding:25px;
+border-radius:10px;
+width:500px;
+}
+
+textarea{
+width:100%;
+height:110px;
+padding:10px;
+margin-top:10px;
+border:none;
+border-radius:6px;
+}
+
+button{
+margin-top:10px;
+padding:10px;
+width:100%;
+background:#38bdf8;
+border:none;
+border-radius:6px;
+font-weight:bold;
+cursor:pointer;
+}
+
+#result{
+margin-top:20px;
+font-size:22px;
+font-weight:bold;
+text-align:center;
+}
+
+.bar{
+margin-top:10px;
+height:10px;
+background:#334155;
+border-radius:6px;
+overflow:hidden;
+}
+
+.fill{
+height:100%;
+width:0%;
+background:#22c55e;
+}
+
+.words{
+margin-top:15px;
+font-size:14px;
+color:#cbd5f5;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="box">
+
+<h2>AI Mood Inspector</h2>
+
+<p>Enter a sentence and the AI will detect the mood.</p>
+
+<textarea id="inputText" placeholder="Today is a wonderful day"></textarea>
+
+<button onclick="detectMood()">Check Mood</button>
+
+<div id="result"></div>
+
+<div class="bar">
+<div id="meter" class="fill"></div>
+</div>
+
+<div id="wordImpact" class="words"></div>
+
+</div>
+
+<script>
+
+// New training dataset
+const dataset = [
+{t:"this is wonderful",s:1},
+{t:"i feel great today",s:1},
+{t:"awesome experience",s:1},
+{t:"i really enjoyed this",s:1},
+
+{t:"this is horrible",s:-1},
+{t:"i hate this",s:-1},
+{t:"very disappointing",s:-1},
+{t:"worst thing ever",s:-1},
+
+{t:"this is okay",s:0},
+{t:"nothing special here",s:0}
+]
+
+// Tokenizer
+function cleanText(txt){
+return txt.toLowerCase().replace(/[^\w\s]/g,"").split(/\s+/)
+}
+
+// Mood Model
+class MoodModel{
+
+constructor(){
+this.wordScores={}
+}
+
+train(data){
+
+data.forEach(item=>{
+
+const words=cleanText(item.t)
+
+words.forEach(w=>{
+
+if(!this.wordScores[w]) this.wordScores[w]=0
+
+this.wordScores[w]+=item.s
+
+})
+
+})
+
+}
+
+evaluate(text){
+
+const words=cleanText(text)
+
+let score=0
+let details=[]
+
+words.forEach(w=>{
+
+const val=this.wordScores[w]||0
+
+score+=val
+
+if(val!==0) details.push(w+"("+val+")")
+
+})
+
+return {score,details}
+
+}
+
+}
+
+const ai=new MoodModel()
+ai.train(dataset)
+
+function detectMood(){
+
+const text=document.getElementById("inputText").value
+
+if(!text.trim()) return
+
+const res=ai.evaluate(text)
+
+let mood
+let confidence=Math.min(Math.abs(res.score)/5,1)
+
+if(res.score>1) mood="Positive 😊"
+else if(res.score<-1) mood="Negative 😠"
+else mood="Neutral 😐"
+
+document.getElementById("result").innerText=mood
+
+document.getElementById("meter").style.width=(confidence*100)+"%"
+
+document.getElementById("wordImpact").innerText=
+"Influential words: "+(res.details.join(", ")||"none")
+
+}
+
+</script>
+
+</body>
+</html>

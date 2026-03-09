@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>AI Mood Detector</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+<style>
+body{
+font-family:Arial;
+background:#111827;
+color:white;
+display:flex;
+justify-content:center;
+padding:60px;
+}
+
+.app{
+background:#1f2937;
+padding:25px;
+border-radius:10px;
+width:420px;
+text-align:center;
+}
+
+textarea{
+width:100%;
+height:110px;
+padding:10px;
+border-radius:6px;
+border:none;
+margin-top:10px;
+}
+
+#output{
+margin-top:20px;
+font-size:22px;
+font-weight:bold;
+}
+
+.meter{
+margin-top:10px;
+height:10px;
+background:#374151;
+border-radius:6px;
+overflow:hidden;
+}
+
+.fill{
+height:100%;
+width:0%;
+background:#22c55e;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<h2>AI Mood Detector</h2>
+
+<textarea id="textBox" placeholder="Type something..."></textarea>
+
+<div id="output">Loading AI...</div>
+
+<div class="meter">
+<div id="bar" class="fill"></div>
+</div>
+
+</div>
+
+<script>
+
+let sentimentModel
+let wordMeta
+
+async function initializeAI(){
+
+sentimentModel = await tf.loadLayersModel(
+"https://storage.googleapis.com/tfjs-models/tfjs/sentiment_cnn_v1/model.json"
+)
+
+wordMeta = await fetch(
+"https://storage.googleapis.com/tfjs-models/tfjs/sentiment_cnn_v1/metadata.json"
+).then(r=>r.json())
+
+document.getElementById("output").innerText="Model Ready"
+
+}
+
+initializeAI()
+
+function convertTextToSequence(sentence){
+
+sentence = sentence
+.toLowerCase()
+.replace(/[^\w\s]/g,"")
+
+let tokens = sentence.split(" ")
+
+let seq = tokens.map(word=>{
+
+let index = wordMeta.word_index[word]
+
+if(!index) return 2
+
+index += wordMeta.index_from
+
+if(index > wordMeta.vocabulary_size) return 2
+
+return index
+
+})
+
+while(seq.length < wordMeta.max_len){
+seq.unshift(0)
+}
+
+if(seq.length > wordMeta.max_len){
+seq.splice(0, seq.length-wordMeta.max_len)
+}
+
+return seq
+
+}
+
+function interpretScore(score){
+
+if(score > 0.65) return {label:"Positive 😊"}
+if(score < 0.35) return {label:"Negative 😡"}
+
+return {label:"Neutral 😐"}
+
+}
+
+async function analyzeText(){
+
+const text = document.getElementById("textBox").value
+
+if(text.length < 3) return
+
+const seq = convertTextToSequence(text)
+
+const inputTensor = tf.tensor2d([seq])
+
+const prediction = sentimentModel.predict(inputTensor)
+
+const score = (await prediction.data())[0]
+
+const mood = interpretScore(score)
+
+document.getElementById("output").innerText =
+mood.label + " ("+(score*100).toFixed(1)+"%)"
+
+document.getElementById("bar").style.width =
+(score*100)+"%"
+
+inputTensor.dispose()
+prediction.dispose()
+
+}
+
+document.getElementById("textBox")
+.addEventListener("input", analyzeText)
+
+</script>
+
+</body>
+</html>
