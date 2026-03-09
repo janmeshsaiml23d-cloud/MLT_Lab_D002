@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Assignment 3: AI Generalization Test</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+text-align:center;
+padding:20px;
+background:linear-gradient(135deg,#ffecd2,#fcb69f);
+}
+
+.box{
+max-width:650px;
+margin:auto;
+background:white;
+padding:25px;
+border-radius:15px;
+box-shadow:0 10px 20px rgba(0,0,0,0.15);
+}
+
+input{
+padding:10px;
+width:60%;
+border:2px solid #ddd;
+border-radius:6px;
+font-size:1.1em;
+}
+
+button{
+padding:10px 20px;
+background:#ff5722;
+color:white;
+border:none;
+border-radius:6px;
+cursor:pointer;
+font-weight:bold;
+margin-left:5px;
+}
+
+#output{
+margin-top:15px;
+font-size:1.3em;
+color:#ff5722;
+}
+
+#equation{
+margin-top:10px;
+font-weight:bold;
+color:#444;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="box">
+
+<h2>Assignment 3: AI Generalization</h2>
+
+<p>Training Rule: <b>y = 4x − 3</b></p>
+<p><small>Trained on: x = [1,2,3,4,5]</small></p>
+
+<input type="number" id="unseenX" placeholder="Enter unseen number (ex: 15)">
+<button onclick="predictNow()">Predict</button>
+
+<div id="output">Status: Training AI...</div>
+<div id="equation">AI Equation: -</div>
+
+<canvas id="unseenChart"></canvas>
+
+</div>
+
+<script>
+
+let model
+let chart
+
+const ctx=document.getElementById("unseenChart").getContext("2d")
+
+chart=new Chart(ctx,{
+data:{
+datasets:[
+
+{
+type:"scatter",
+label:"Training Data",
+
+data:[
+{x:1,y:1},
+{x:2,y:5},
+{x:3,y:9},
+{x:4,y:13},
+{x:5,y:17}
+],
+
+backgroundColor:"#ff9800",
+pointRadius:6
+},
+
+{
+type:"line",
+label:"AI Learned Line",
+data:[],
+borderColor:"#ff5722",
+borderWidth:3,
+fill:false
+}
+
+]
+},
+
+options:{
+scales:{
+x:{type:"linear",min:0,max:10},
+y:{min:-5,max:30}
+}
+}
+
+})
+
+async function initModel(){
+
+model=tf.sequential()
+
+model.add(
+tf.layers.dense({units:1,inputShape:[1]})
+)
+
+model.compile({
+optimizer:tf.train.adam(0.1),
+loss:"meanSquaredError"
+})
+
+const xs=tf.tensor2d([1,2,3,4,5],[5,1])
+
+const ys=tf.tensor2d([1,5,9,13,17],[5,1])
+
+await model.fit(xs,ys,{epochs:200,verbose:0})
+
+document.getElementById("output")
+.innerText="Status: Model Ready!"
+
+// show AI equation
+const w=model.getWeights()[0].dataSync()[0]
+const b=model.getWeights()[1].dataSync()[0]
+
+document.getElementById("equation")
+.innerText=`AI Equation: y = ${w.toFixed(2)}x + ${b.toFixed(2)}`
+
+updateLine()
+
+}
+
+async function predictNow(){
+
+const val=parseFloat(
+document.getElementById("unseenX").value
+)
+
+if(isNaN(val)) return
+
+const input=tf.tensor2d([val],[1,1])
+
+const prediction=model.predict(input)
+
+const result=(await prediction.data())[0]
+
+const expected=4*val-3
+
+const error=Math.abs(expected-result)
+
+document.getElementById("output").innerHTML=
+
+`AI Prediction: <b>${result.toFixed(2)}</b>
+<br>Actual Value: ${expected}
+<br>Error: ${error.toFixed(2)}`
+
+updateLine(val)
+
+}
+
+function updateLine(maxX=12){
+
+const range=[0,maxX]
+
+const preds=model
+.predict(tf.tensor2d(range,[2,1]))
+.dataSync()
+
+chart.data.datasets[1].data=[
+
+{x:range[0],y:preds[0]},
+{x:range[1],y:preds[1]}
+
+]
+
+chart.update()
+
+}
+
+initModel()
+
+</script>
+
+</body>
+</html>

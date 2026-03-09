@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>AI Linear Discovery</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+font-family: Arial;
+text-align:center;
+background:linear-gradient(135deg,#4facfe,#00f2fe);
+padding:30px;
+color:white;
+}
+
+.container{
+max-width:750px;
+margin:auto;
+background:white;
+color:black;
+padding:25px;
+border-radius:12px;
+box-shadow:0 10px 20px rgba(0,0,0,0.2);
+}
+
+#equation{
+font-size:28px;
+font-weight:bold;
+color:#ff006e;
+margin:20px 0;
+}
+
+.stats{
+display:flex;
+justify-content:space-around;
+background:#f1f1f1;
+padding:12px;
+border-radius:8px;
+margin-bottom:15px;
+}
+
+.statbox{
+font-size:18px;
+}
+
+#loss{
+color:#0077ff;
+font-weight:bold;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>AI Learning Linear Equation</h2>
+<p>Hidden Equation used to generate data: <b>y = 5x - 7</b></p>
+
+<div id="equation">Training AI...</div>
+
+<div class="stats">
+
+<div class="statbox">
+Weight (m): <span id="weight-val">-</span>
+</div>
+
+<div class="statbox">
+Bias (b): <span id="bias-val">-</span>
+</div>
+
+<div class="statbox">
+Loss: <span id="loss">-</span>
+</div>
+
+</div>
+
+<canvas id="chart"></canvas>
+
+</div>
+
+<script>
+
+async function startAI(){
+
+// Generate Data
+const xVals=[]
+const yVals=[]
+
+for(let i=0;i<40;i++){
+
+xVals.push(i)
+
+yVals.push(
+5*i - 7 + (Math.random()*4 -2)
+)
+
+}
+
+// Normalize
+const xs=tf.tensor2d(xVals,[40,1]).div(40)
+const ys=tf.tensor2d(yVals,[40,1]).div(200)
+
+// Model
+const model=tf.sequential()
+
+model.add(
+tf.layers.dense({
+units:1,
+inputShape:[1]
+})
+)
+
+model.compile({
+
+optimizer:tf.train.adam(0.05),
+
+loss:'meanSquaredError'
+
+})
+
+// Train with callback
+await model.fit(xs,ys,{
+
+epochs:200,
+
+callbacks:{
+
+onEpochEnd:(epoch,logs)=>{
+
+document.getElementById("loss").innerText=
+logs.loss.toFixed(5)
+
+}
+
+}
+
+})
+
+// Get weights
+const weight=model.getWeights()[0].dataSync()[0]
+const bias=model.getWeights()[1].dataSync()[0]
+
+// Un-normalize
+const finalM=(weight*200/40).toFixed(2)
+const finalB=(bias*200).toFixed(2)
+
+document.getElementById("weight-val").innerText=finalM
+document.getElementById("bias-val").innerText=finalB
+
+document.getElementById("equation").innerText=
+`AI Discovered: y = ${finalM}x + ${finalB}`
+
+
+// Prediction
+const preds=model.predict(xs).dataSync()
+
+const unnormPreds=
+Array.from(preds).map(p=>p*200)
+
+// Chart
+new Chart(
+
+document.getElementById("chart"),
+
+{
+
+type:"scatter",
+
+data:{
+
+datasets:[
+
+{
+
+label:"Actual Data",
+
+data:xVals.map(
+(x,i)=>({x:x,y:yVals[i]})
+),
+
+backgroundColor:"#0077ff"
+
+},
+
+{
+
+label:"AI Prediction",
+
+type:"line",
+
+data:xVals.map(
+(x,i)=>({x:x,y:unnormPreds[i]})
+),
+
+borderColor:"#ff006e",
+
+borderWidth:3,
+
+fill:false,
+
+tension:0.3
+
+}
+
+]
+
+},
+
+options:{
+
+animation:{
+
+duration:2000
+
+},
+
+scales:{
+
+x:{title:{display:true,text:"X"}},
+
+y:{title:{display:true,text:"Y"}}
+
+}
+
+}
+
+}
+
+)
+
+}
+
+startAI()
+
+</script>
+
+</body>
+</html>

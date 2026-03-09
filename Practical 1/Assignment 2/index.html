@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>AI Learning Rate Experiment</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+font-family:Segoe UI;
+padding:20px;
+background:linear-gradient(120deg,#89f7fe,#66a6ff);
+text-align:center;
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(4,1fr);
+gap:20px;
+max-width:1300px;
+margin:auto;
+}
+
+.card{
+background:white;
+padding:15px;
+border-radius:12px;
+box-shadow:0 4px 10px rgba(0,0,0,0.15);
+}
+
+h4{margin-top:0;}
+
+.loss-text{
+font-family:monospace;
+font-weight:bold;
+font-size:1.1em;
+color:#ff006e;
+}
+
+.eq-text{
+font-weight:bold;
+color:#333;
+}
+
+button{
+padding:14px 30px;
+font-size:1em;
+background:#111;
+color:white;
+border:none;
+border-radius:8px;
+cursor:pointer;
+margin-bottom:25px;
+}
+
+</style>
+</head>
+
+<body>
+
+<h2>Experiment: Learning Rate Comparison</h2>
+
+<p>Target Equation: <b>y = 3x + 2</b></p>
+
+<button onclick="runAll()">Start AI Training</button>
+
+<div class="grid">
+
+<div class="card">
+<h4 style="color:#2196F3">Very Low LR (0.0005)</h4>
+<div id="loss-0" class="loss-text">Loss: -</div>
+<div id="eq-0" class="eq-text">AI Line: -</div>
+<canvas id="canvas-0"></canvas>
+</div>
+
+<div class="card">
+<h4 style="color:#4CAF50">Good LR (0.05)</h4>
+<div id="loss-1" class="loss-text">Loss: -</div>
+<div id="eq-1" class="eq-text">AI Line: -</div>
+<canvas id="canvas-1"></canvas>
+</div>
+
+<div class="card">
+<h4 style="color:#FF9800">High LR (0.8)</h4>
+<div id="loss-2" class="loss-text">Loss: -</div>
+<div id="eq-2" class="eq-text">AI Line: -</div>
+<canvas id="canvas-2"></canvas>
+</div>
+
+<div class="card">
+<h4 style="color:#F44336">Extreme LR (2.5)</h4>
+<div id="loss-3" class="loss-text">Loss: -</div>
+<div id="eq-3" class="eq-text">AI Line: -</div>
+<canvas id="canvas-3"></canvas>
+</div>
+
+</div>
+
+<script>
+
+const setupChart=(id)=>{
+
+const ctx=document.getElementById(`canvas-${id}`).getContext("2d")
+
+return new Chart(ctx,{
+
+data:{
+
+datasets:[
+
+{
+type:"scatter",
+label:"Actual Data",
+
+data:[
+{x:1,y:5},
+{x:2,y:8},
+{x:3,y:11},
+{x:4,y:14}
+],
+
+backgroundColor:"black",
+pointRadius:6
+},
+
+{
+type:"line",
+label:"AI Prediction",
+data:[],
+borderColor:
+id===0?"#2196F3":
+id===1?"#4CAF50":
+id===2?"#FF9800":"#F44336",
+
+borderWidth:4,
+fill:false,
+tension:0
+}
+
+]
+
+},
+
+options:{
+scales:{
+x:{type:"linear",min:0,max:5},
+y:{min:0,max:16}
+}
+}
+
+})
+
+}
+
+const charts=[
+setupChart(0),
+setupChart(1),
+setupChart(2),
+setupChart(3)
+]
+
+async function trainModel(index,lr){
+
+const model=tf.sequential()
+
+model.add(
+tf.layers.dense({units:1,inputShape:[1]})
+)
+
+model.compile({
+optimizer:tf.train.sgd(lr),
+loss:"meanSquaredError"
+})
+
+const xs=tf.tensor2d([1,2,3,4],[4,1])
+const ys=tf.tensor2d([5,8,11,14],[4,1])
+
+for(let i=0;i<60;i++){
+
+const h=await model.fit(xs,ys,{epochs:1,verbose:0})
+
+const loss=h.history.loss[0]
+
+document.getElementById(`loss-${index}`)
+.innerText=`Loss: ${loss.toFixed(4)}`
+
+// get weights
+const w=model.getWeights()[0].dataSync()[0]
+const b=model.getWeights()[1].dataSync()[0]
+
+document.getElementById(`eq-${index}`)
+.innerText=`AI Line: y = ${w.toFixed(2)}x + ${b.toFixed(2)}`
+
+// update chart
+const lineX=[0,5]
+
+const lineY=model
+.predict(tf.tensor2d(lineX,[2,1]))
+.dataSync()
+
+charts[index].data.datasets[1].data=[
+{x:lineX[0],y:lineY[0]},
+{x:lineX[1],y:lineY[1]}
+]
+
+charts[index].update("none")
+
+await tf.nextFrame()
+
+}
+
+}
+
+function runAll(){
+
+trainModel(0,0.0005)
+
+trainModel(1,0.05)
+
+trainModel(2,0.8)
+
+trainModel(3,2.5)
+
+}
+
+</script>
+
+</body>
+</html>
