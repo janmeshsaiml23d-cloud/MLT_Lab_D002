@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Neural Network Showdown</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:#020617;
+color:white;
+text-align:center;
+padding:20px;
+}
+
+.grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:20px;
+max-width:1000px;
+margin:auto;
+}
+
+.card{
+background:#0f172a;
+padding:20px;
+border-radius:12px;
+}
+
+button{
+padding:10px;
+border:none;
+border-radius:6px;
+cursor:pointer;
+margin-top:10px;
+}
+
+.btn1{background:#f97316;color:white}
+.btn2{background:#06b6d4;color:black}
+
+canvas{
+background:black;
+border:4px solid #1e293b;
+border-radius:10px;
+}
+
+.pred{
+font-size:60px;
+font-weight:bold;
+}
+
+.bar{
+height:8px;
+background:#1e293b;
+border-radius:6px;
+overflow:hidden;
+}
+
+.fill{
+height:100%;
+background:#22c55e;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Neural Network Showdown</h1>
+
+<div class="grid">
+
+<div class="card">
+<h3>Dense Network</h3>
+
+<button class="btn1" onclick="trainDense()">Train Dense</button>
+
+<div id="denseStatus">Idle</div>
+
+<div class="pred" id="densePred">-</div>
+
+<div class="bar">
+<div id="denseBar" class="fill"></div>
+</div>
+
+<div id="denseTop"></div>
+
+</div>
+
+<div class="card">
+<h3>Convolution Network</h3>
+
+<button class="btn2" onclick="trainCNN()">Train CNN</button>
+
+<div id="cnnStatus">Idle</div>
+
+<div class="pred" id="cnnPred">-</div>
+
+<div class="bar">
+<div id="cnnBar" class="fill"></div>
+</div>
+
+<div id="cnnTop"></div>
+
+</div>
+
+</div>
+
+<br>
+
+<canvas id="draw" width="280" height="280"></canvas>
+
+<br>
+
+<button onclick="clearCanvas()">Clear</button>
+
+<script>
+
+let denseModel
+let cnnModel
+
+const canvas=document.getElementById("draw")
+const ctx=canvas.getContext("2d")
+
+ctx.fillStyle="black"
+ctx.fillRect(0,0,280,280)
+
+ctx.lineWidth=20
+ctx.lineCap="round"
+ctx.strokeStyle="white"
+
+let drawing=false
+
+function pos(e){
+
+const r=canvas.getBoundingClientRect()
+
+return{
+x:(e.touches?e.touches[0].clientX:e.clientX)-r.left,
+y:(e.touches?e.touches[0].clientY:e.clientY)-r.top
+}
+
+}
+
+canvas.addEventListener("mousedown",e=>{
+drawing=true
+const p=pos(e)
+ctx.beginPath()
+ctx.moveTo(p.x,p.y)
+})
+
+canvas.addEventListener("mousemove",e=>{
+if(!drawing)return
+const p=pos(e)
+ctx.lineTo(p.x,p.y)
+ctx.stroke()
+predict()
+})
+
+window.addEventListener("mouseup",()=>drawing=false)
+
+function preprocess(){
+
+return tf.browser.fromPixels(canvas,1)
+.resizeBilinear([28,28])
+.toFloat()
+.div(255)
+.expandDims(0)
+
+}
+
+function showTop(preds,id){
+
+let arr=[...preds]
+
+let sorted=arr
+.map((v,i)=>({d:i,p:v}))
+.sort((a,b)=>b.p-a.p)
+
+let html="Top Predictions<br>"
+
+for(let i=0;i<3;i++){
+
+html+=sorted[i].d+" ("+(sorted[i].p*100).toFixed(1)+"%)<br>"
+
+}
+
+document.getElementById(id).innerHTML=html
+
+return sorted[0]
+
+}
+
+function predict(){
+
+const input=preprocess()
+
+if(denseModel){
+
+const p=denseModel.predict(input).dataSync()
+
+const best=showTop(p,"denseTop")
+
+document.getElementById("densePred").innerText=best.d
+
+document.getElementById("denseBar").style.width=(best.p*100)+"%"
+
+}
+
+if(cnnModel){
+
+const p=cnnModel.predict(input).dataSync()
+
+const best=showTop(p,"cnnTop")
+
+document.getElementById("cnnPred").innerText=best.d
+
+document.getElementById("cnnBar").style.width=(best.p*100)+"%"
+
+}
+
+}
+
+async function trainDense(){
+
+document.getElementById("denseStatus").innerText="Training..."
+
+denseModel=tf.sequential()
+
+denseModel.add(tf.layers.flatten({inputShape:[28,28,1]}))
+denseModel.add(tf.layers.dense({units:128,activation:"relu"}))
+denseModel.add(tf.layers.dense({units:10,activation:"softmax"}))
+
+denseModel.compile({
+optimizer:"adam",
+loss:"categoricalCrossentropy",
+metrics:["accuracy"]
+})
+
+const xs=tf.randomNormal([1500,28,28,1])
+
+const ys=tf.oneHot(
+tf.randomUniform([1500],0,10,"int32"),10)
+
+await denseModel.fit(xs,ys,{epochs:5})
+
+document.getElementById("denseStatus").innerText="Ready"
+
+}
+
+async function trainCNN(){
+
+document.getElementById("cnnStatus").innerText="Training..."
+
+cnnModel=tf.sequential()
+
+cnnModel.add(tf.layers.conv2d({
+inputShape:[28,28,1],
+filters:8,
+kernelSize:3,
+activation:"relu"
+}))
+
+cnnModel.add(tf.layers.maxPooling2d({poolSize:2}))
+
+cnnModel.add(tf.layers.flatten())
+
+cnnModel.add(tf.layers.dense({
+units:10,
+activation:"softmax"
+}))
+
+cnnModel.compile({
+optimizer:"adam",
+loss:"categoricalCrossentropy",
+metrics:["accuracy"]
+})
+
+const xs=tf.randomNormal([1500,28,28,1])
+
+const ys=tf.oneHot(
+tf.randomUniform([1500],0,10,"int32"),10)
+
+await cnnModel.fit(xs,ys,{epochs:5})
+
+document.getElementById("cnnStatus").innerText="Ready"
+
+}
+
+function clearCanvas(){
+
+ctx.fillRect(0,0,280,280)
+
+document.getElementById("densePred").innerText="-"
+document.getElementById("cnnPred").innerText="-"
+
+}
+
+</script>
+
+</body>
+</html>

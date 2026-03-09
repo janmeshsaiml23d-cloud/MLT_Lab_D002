@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Handwritten Digit Analyzer</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:#0f172a;
+color:white;
+display:flex;
+flex-direction:column;
+align-items:center;
+padding:25px;
+}
+
+h1{
+color:#38bdf8;
+}
+
+.wrapper{
+display:flex;
+gap:30px;
+flex-wrap:wrap;
+justify-content:center;
+margin-top:20px;
+}
+
+canvas{
+border:4px solid #1e293b;
+border-radius:10px;
+background:black;
+cursor:crosshair;
+}
+
+.panel{
+background:#1e293b;
+padding:20px;
+border-radius:12px;
+width:260px;
+}
+
+#prediction{
+font-size:70px;
+color:#22c55e;
+font-weight:bold;
+}
+
+.bar{
+height:10px;
+background:#334155;
+margin:4px 0;
+border-radius:6px;
+overflow:hidden;
+}
+
+.barfill{
+height:100%;
+background:#22c55e;
+}
+
+button{
+width:100%;
+padding:10px;
+margin-top:10px;
+border:none;
+background:#38bdf8;
+color:black;
+font-weight:bold;
+border-radius:6px;
+cursor:pointer;
+}
+
+button:hover{
+background:#0ea5e9;
+}
+
+#history{
+margin-top:10px;
+font-size:14px;
+color:#94a3b8;
+}
+
+.smallCanvas{
+margin-top:10px;
+border:1px solid #555;
+width:56px;
+height:56px;
+image-rendering:pixelated;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>AI Digit Analyzer</h1>
+
+<div class="wrapper">
+
+<div>
+<canvas id="draw" width="280" height="280"></canvas>
+</div>
+
+<div class="panel">
+
+<div>Prediction</div>
+<div id="prediction">-</div>
+
+<div id="top3"></div>
+
+<button onclick="clearCanvas()">Clear</button>
+
+<div style="margin-top:15px;">AI Input</div>
+<canvas id="debug" width="28" height="28" class="smallCanvas"></canvas>
+
+<div id="history"></div>
+
+</div>
+
+</div>
+
+<script>
+
+const canvas=document.getElementById("draw")
+const ctx=canvas.getContext("2d",{willReadFrequently:true})
+
+const debug=document.getElementById("debug")
+const dctx=debug.getContext("2d")
+
+let model
+let drawing=false
+
+ctx.fillStyle="black"
+ctx.fillRect(0,0,280,280)
+
+ctx.lineWidth=22
+ctx.lineCap="round"
+ctx.strokeStyle="white"
+
+async function loadModel(){
+
+model=await tf.loadLayersModel(
+"https://storage.googleapis.com/tfjs-models/tfjs/mnist_transfer_cnn_v1/model.json"
+)
+
+model.predict(tf.zeros([1,28,28,1])).dispose()
+
+}
+
+loadModel()
+
+function bbox(){
+
+const img=ctx.getImageData(0,0,280,280)
+
+let minX=280,minY=280,maxX=0,maxY=0
+let found=false
+
+for(let y=0;y<280;y++){
+for(let x=0;x<280;x++){
+
+const val=img.data[(y*280+x)*4]
+
+if(val>20){
+
+found=true
+
+if(x<minX)minX=x
+if(x>maxX)maxX=x
+if(y<minY)minY=y
+if(y>maxY)maxY=y
+
+}
+
+}
+}
+
+if(!found)return null
+
+return{
+x:minX,
+y:minY,
+w:maxX-minX,
+h:maxY-minY
+}
+
+}
+
+function preprocess(){
+
+const box=bbox()
+
+if(!box)return null
+
+const temp=document.createElement("canvas")
+temp.width=20
+temp.height=20
+
+const tctx=temp.getContext("2d")
+
+const max=Math.max(box.w,box.h)
+
+const scale=20/max
+
+tctx.drawImage(
+canvas,
+box.x,box.y,box.w,box.h,
+(20-box.w*scale)/2,
+(20-box.h*scale)/2,
+box.w*scale,
+box.h*scale
+)
+
+dctx.fillStyle="black"
+dctx.fillRect(0,0,28,28)
+
+dctx.drawImage(temp,4,4)
+
+return tf.browser.fromPixels(debug,1)
+.toFloat()
+.div(255)
+.expandDims(0)
+
+}
+
+function predict(){
+
+if(!model)return
+
+const input=preprocess()
+
+if(!input)return
+
+const preds=model.predict(input).dataSync()
+
+let arr=[...preds]
+
+let sorted=arr
+.map((v,i)=>({d:i,p:v}))
+.sort((a,b)=>b.p-a.p)
+
+document.getElementById("prediction").innerText=sorted[0].d
+
+let html=""
+
+for(let i=0;i<3;i++){
+
+let percent=(sorted[i].p*100).toFixed(1)
+
+html+=`
+
+<div>${sorted[i].d} (${percent}%)</div>
+
+<div class="bar">
+<div class="barfill" style="width:${percent}%"></div>
+</div>
+
+`
+
+}
+
+document.getElementById("top3").innerHTML=html
+
+let hist=document.getElementById("history")
+
+hist.innerHTML=
+"Last Prediction: "+sorted[0].d
+
+}
+
+function pos(e){
+
+const rect=canvas.getBoundingClientRect()
+
+return{
+x:(e.touches?e.touches[0].clientX:e.clientX)-rect.left,
+y:(e.touches?e.touches[0].clientY:e.clientY)-rect.top
+}
+
+}
+
+function start(e){
+
+drawing=true
+
+const p=pos(e)
+
+ctx.beginPath()
+ctx.moveTo(p.x,p.y)
+
+}
+
+function draw(e){
+
+if(!drawing)return
+
+const p=pos(e)
+
+ctx.lineTo(p.x,p.y)
+ctx.stroke()
+
+predict()
+
+}
+
+function stop(){
+
+drawing=false
+ctx.beginPath()
+
+}
+
+canvas.addEventListener("mousedown",start)
+canvas.addEventListener("mousemove",draw)
+window.addEventListener("mouseup",stop)
+
+canvas.addEventListener("touchstart",start)
+canvas.addEventListener("touchmove",draw)
+window.addEventListener("touchend",stop)
+
+function clearCanvas(){
+
+ctx.fillRect(0,0,280,280)
+
+dctx.fillRect(0,0,28,28)
+
+document.getElementById("prediction").innerText="-"
+document.getElementById("top3").innerHTML=""
+document.getElementById("history").innerHTML=""
+
+}
+
+</script>
+
+</body>
+</html>

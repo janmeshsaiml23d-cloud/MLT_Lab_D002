@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>AI CNN Training Lab</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:#0f172a;
+color:white;
+display:flex;
+justify-content:center;
+padding:30px;
+}
+
+.card{
+background:#1e293b;
+padding:25px;
+border-radius:12px;
+width:700px;
+}
+
+button{
+padding:12px;
+margin:10px 0;
+border:none;
+border-radius:6px;
+font-weight:bold;
+cursor:pointer;
+}
+
+.train{background:#22c55e;color:black}
+.sim{background:#3b82f6;color:white}
+
+#log{
+background:black;
+color:#22ff88;
+padding:15px;
+height:180px;
+overflow:auto;
+font-family:monospace;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>CNN Training Experiment</h2>
+
+<button class="sim" onclick="train(true)">Train With Synthetic Data</button>
+<button class="train" onclick="train(false)">Train With MNIST Style Data</button>
+
+<div id="log">System Ready...</div>
+
+</div>
+
+<script>
+
+const log=(m)=>{
+document.getElementById("log").innerHTML+=m+"<br>"
+}
+
+function createModel(){
+
+const model=tf.sequential()
+
+model.add(tf.layers.conv2d({
+inputShape:[28,28,1],
+filters:12,
+kernelSize:3,
+activation:"relu"
+}))
+
+model.add(tf.layers.maxPooling2d({poolSize:2}))
+
+model.add(tf.layers.flatten())
+
+model.add(tf.layers.dense({
+units:10,
+activation:"softmax"
+}))
+
+model.compile({
+optimizer:"adam",
+loss:"categoricalCrossentropy",
+metrics:["accuracy"]
+})
+
+return model
+}
+
+async function train(sim){
+
+log("Preparing Dataset...")
+
+let xs
+let ys
+
+if(sim){
+
+xs=tf.randomNormal([1500,28,28,1])
+
+ys=tf.oneHot(
+tf.randomUniform([1500],0,10,"int32"),
+10
+)
+
+}else{
+
+xs=tf.randomNormal([2000,28,28,1])
+ys=tf.oneHot(
+tf.randomUniform([2000],0,10,"int32"),
+10
+)
+
+}
+
+const model=createModel()
+
+log("Training Model...")
+
+await model.fit(xs,ys,{
+
+epochs:7,
+batchSize:128,
+
+callbacks:{
+onEpochEnd:(e,l)=>{
+
+log(
+`Epoch ${e+1} | Loss: ${l.loss.toFixed(3)} | Acc: ${(l.acc*100).toFixed(1)}%`
+)
+
+}
+}
+
+})
+
+log("<b>Training Complete</b>")
+
+}
+
+</script>
+
+</body>
+</html>
